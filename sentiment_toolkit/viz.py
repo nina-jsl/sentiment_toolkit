@@ -94,6 +94,40 @@ def _ensure_one_series(obj, role: str) -> pd.Series:
     s = s.sort_index()
     return s
 
+def rebase_series(s: pd.Series, base: float = 100.0) -> pd.Series:
+    s = s.copy()
+    non_na = s.dropna()
+    if non_na.empty:
+        return s
+    first = non_na.iloc[0]
+    if not np.isfinite(first) or first == 0:
+        return s
+    out = s / first * base
+    out.name = s.name
+    return out
+
+def fixed_bands(levels: List[Tuple[float, float, str]]) -> List[Tuple[float, float, str]]:
+    # [(low, high, label)]
+    return [(float(lo), float(hi), str(lbl)) for lo, hi, lbl in levels]
+
+def bands_with_style(
+    bands: List[Tuple[float, float, str]],
+    label_styles: dict = None,
+    default_alpha: float = 0.12,
+) -> List[Tuple[float, float, str, float, str]]:
+    """
+    Map [(low, high, label)] -> [(low, high, color, alpha, label)]
+    """
+    label_styles = label_styles or {
+        "Fear": ("tab:green", default_alpha),
+        "Overheat": ("tab:red", default_alpha),
+    }
+    out = []
+    for low, high, label in bands:
+        color, alpha = label_styles.get(label, ("gray", default_alpha))
+        out.append((low, high, color, alpha, label))
+    return out
+
 def plot_overlay(
     df: Union[pd.Series, pd.DataFrame],
     baseline: Optional[Union[str, float]] = None,
@@ -144,10 +178,11 @@ def plot_overlay(
     return fig, ax
 
 def plot_dual_vs_benchmark(
-    index_series,             # Series or 1-col DataFrame (the sentiment component / index)
-    benchmark_series,         # Series or 1-col DataFrame
-    rebased: bool = False,    # usually False for dual-axis (different scales)
-    base_value: float = 100.0,
+    index_series,
+    benchmark_series,
+    *,
+    rebase: Union[bool, float] = False,   # False | True | 100.0
+    bands: Optional[List[Tuple[float, float, str, float, str]]] = None,  # [(lo,hi,color,alpha,label)]
     figsize=(14, 6),
     linewidth_index=2.0,
     linewidth_bm=2.0,
@@ -157,45 +192,37 @@ def plot_dual_vs_benchmark(
     ylabel_left=None,
     ylabel_right=None,
     legend=True,
+    color_left="tab:blue",
+    color_right="tab:red",
+    no_x_margin=True,
     show=True,
     savepath=None,
-    # NEW styling controls (defaults satisfy your request):
-    color_left: str = "tab:blue",
-    color_right: str = "tab:red",
-    no_x_margin: bool = True,
 ):
-    idx = _ensure_one_series(index_series, "index_series")
+    idx = _ensure_one_series(index_series, "index")
     bm  = _ensure_one_series(benchmark_series, "benchmark")
 
-    # align by intersection
     df = pd.concat([idx.rename("index"), bm.rename("benchmark")], axis=1, join="inner").dropna()
     if df.empty:
         raise ValueError("No overlapping dates between index and benchmark.")
 
-    if rebased:
-        def _rebase_to(series, base=100.0):
-            s = series.dropna()
-            if s.empty:
-                return series
-            first = s.iloc[0]
-            if not np.isfinite(first) or first == 0:
-                return series
-            return series / first * base
-        df["index"]     = _rebase_to(df["index"], base=base_value)
-        df["benchmark"] = _rebase_to(df["benchmark"], base=base_value)
+    # optional plotting-time rebase (both)
+    if rebase is not False:
+        base = float(rebase) if isinstance(rebase, (int, float)) else 100.0
+        df["index"]     = rebase_series(df["index"], base=base)
+        df["benchmark"] = rebase_series(df["benchmark"], base=base)
 
     fig, ax_left = plt.subplots(figsize=figsize)
     ax_right = ax_left.twinx()
 
-    # plot index (left) and force color/width
-    line_left, = ax_left.plot(df.index, df["index"].values,
-                              linewidth=linewidth_index, label=df["index"].name or "index",
-                              color=color_left)
-    # plot benchmark (right) and force color/width/style
-    line_right, = ax_right.plot(df.index, df["benchmark"].values,
-                                linewidth=linewidth_bm, linestyle=style_bm,
-                                label=df["benchmark"].name or "benchmark",
-                                color=color_right)
+    ax_left.plot(df.index, df["index"].values, linewidth=linewidth_index, color=color_left,
+                 label=df["index"].name or "index")
+    ax_right.plot(df.index, df["benchmark"].values, linewidth=linewidth_bm, linestyle=style_bm, color=color_right,
+                  label=df["benchmark"].name or "benchmark")
+
+    # shaded bands on LEFT axis (sentiment scale)
+    if bands:
+        for lo, hi, color, alpha, label in bands:
+            ax_left.axhspan(lo, hi, color=color, alpha=alpha, label=label)
 
     if grid:
         ax_left.grid(alpha=0.25)
@@ -205,24 +232,27 @@ def plot_dual_vs_benchmark(
     if ylabel_right:
         ax_right.set_ylabel(ylabel_right)
 
-    # Always remove x-axis margin if requested
+    if legend:
+        lines, labels = [], []
+        for a in (ax_left, ax_right):
+            h, l = a.get_legend_handles_labels()
+            lines.extend(h); labels.extend(l)
+        # de-duplicate labels (bands may add dup labels)
+        seen = set()
+        uniq = [(h, l) for h, l in zip(lines, labels) if not (l in seen or seen.add(l))]
+        if uniq:
+            lines, labels = zip(*uniq)
+            ax_left.legend(lines, labels, loc="best")
+
     if no_x_margin:
         ax_left.margins(x=0)
         ax_right.margins(x=0)
-
-    # Combined legend
-    if legend:
-        ax_left.legend([line_left, line_right],
-                       [line_left.get_label(), line_right.get_label()],
-                       loc="best")
-
     fig.tight_layout()
 
     if savepath:
         fig.savefig(savepath, dpi=200, bbox_inches="tight")
     if show:
         plt.show()
-
     return fig, (ax_left, ax_right)
 
 def plot_components_vs_benchmark(
