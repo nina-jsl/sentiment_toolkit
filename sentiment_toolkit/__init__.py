@@ -11,4 +11,5 @@ from .viz import (
     plot_each_series, plot_overlay, plot_dual_vs_benchmark,
     rebase_series, fixed_bands, bands_with_style,
 )
+from.utils import ensure_series, weights_from_aliases
 from .style import enable_chinese_font
