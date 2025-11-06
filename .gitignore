@@ -12,3 +12,13 @@ dist/
 .venv
 venv/
 ENV/
+__pycache__/
+*.py[cod]
+*.pyo
+.ipynb_checkpoints/
+*.egg-info/
+dist/
+build/
+.venv
+venv/
+.env
