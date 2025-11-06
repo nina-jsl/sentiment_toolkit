@@ -3,6 +3,8 @@ pyproject.toml
 sentiment_toolkit/__init__.py
 sentiment_toolkit/data.py
 sentiment_toolkit/schema.py
+sentiment_toolkit/transform.py
+sentiment_toolkit/viz.py
 sentiment_toolkit.egg-info/PKG-INFO
 sentiment_toolkit.egg-info/SOURCES.txt
 sentiment_toolkit.egg-info/dependency_links.txt
