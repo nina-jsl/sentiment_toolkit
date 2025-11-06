@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: sentiment_toolkit
+Version: 0.1.0
+Summary: China market sentiment index calculation toolkit
+Author-email: Nina Li <jl13999@nyu.edu>
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: pandas>=1.5
+Requires-Dist: numpy>=1.22
+Requires-Dist: openpyxl>=3.1

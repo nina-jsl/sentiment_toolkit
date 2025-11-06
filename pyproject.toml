@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentiment_toolkit"
+version = "0.1.0"
+description = "China market sentiment index calculation toolkit"
+authors = [{ name = "Nina Li", email = "jl13999@nyu.edu" }]
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+    "pandas>=1.5",
+    "numpy>=1.22",
+    "openpyxl>=3.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sentiment_toolkit*"]
